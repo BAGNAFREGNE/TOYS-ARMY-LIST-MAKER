@@ -131,7 +131,6 @@ class ToysArmyApp:
             for filename in files:
                 safe_name = filename.replace(".txt", "")
                 
-                # NOME LISTA (Cliccabile per aprire la nuova schermata)
                 btn_open = ft.Container(
                     content=ft.Text(safe_name, color="blue", size=18, weight="bold"),
                     on_click=lambda e, f=filename: self.open_list_screen(f),
@@ -164,7 +163,7 @@ class ToysArmyApp:
         )
         self.page.update()
 
-    # --- NUOVA SCHERMATA: LEGGI LISTA (Schermo Intero) ---
+    # --- NUOVA SCHERMATA: LEGGI LISTA ---
     def open_list_screen(self, filename):
         try:
             full_path = os.path.join(self.exe_path, filename)
@@ -174,20 +173,17 @@ class ToysArmyApp:
             
             if not content: content = "Il file è vuoto."
 
-            # Creiamo una vera schermata, non un popup
             self.page.clean()
 
-            # Contenitore del testo (stile foglio di carta)
             text_container = ft.Container(
                 content=ft.Text(content, size=16, color="black", weight="w500"),
                 bgcolor="white",
                 padding=15,
                 border_radius=10,
                 border=ft.border.all(1, "grey"),
-                width=350 # Larghezza fissa per renderlo leggibile
+                width=350 
             )
 
-            # Contenuto principale
             main_content = ft.Column([
                 text_container
             ], scroll="auto", alignment=ft.MainAxisAlignment.START, horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True)
@@ -196,7 +192,6 @@ class ToysArmyApp:
                 ft.AppBar(
                     title=ft.Text(filename.replace(".txt", "")), 
                     bgcolor="blue", color="white",
-                    # Il tasto Back riporta alle liste salvate
                     leading=self.get_smart_button("Back.png", "<", lambda _: self.show_saved_lists())
                 ),
                 self.wrap_with_bg(main_content)
@@ -258,7 +253,7 @@ class ToysArmyApp:
             self.page.snack_bar.open = True
             self.page.update()
 
-    # --- 7. UNITÀ ---
+    # --- 7. UNITÀ (MODIFICATA PER IL MENÙ) ---
     def show_units(self):
         self.page.clean()
         container_list = []
@@ -273,8 +268,21 @@ class ToysArmyApp:
                     except: cost = 0
                     opts.append(ft.dropdown.Option(text=f"{name} ({cost})", key=name))
 
-            dd = ft.Dropdown(label="Seleziona", options=opts, expand=True, bgcolor="white")
-            qty = ft.TextField(value="1", label="Qta", width=60, bgcolor="white")
+            # MODIFICA DROPDOWN:
+            # - dense=True: rende la lista più compatta
+            # - text_size=14: rimpicciolisce il testo
+            # - content_padding=10: aggiusta lo spazio interno
+            dd = ft.Dropdown(
+                label="Seleziona", 
+                options=opts, 
+                expand=True, 
+                bgcolor="white",
+                dense=True,         
+                text_size=14,       
+                content_padding=10  
+            )
+            
+            qty = ft.TextField(value="1", label="Qta", width=60, bgcolor="white", text_size=14, content_padding=10)
             
             def add_btn_click(e):
                 self.add_item_logic(dd.value, qty.value, data, cost_idx)
@@ -283,12 +291,19 @@ class ToysArmyApp:
                 self.page.snack_bar.open = True
                 self.page.update()
 
+            # Aggiungiamo padding extra al container per centrare meglio il menù nello schermo
             return ft.Container(
                 content=ft.Column([
                     ft.Text(label, weight="bold"),
-                    ft.Row([dd, qty]),
+                    ft.Row([dd, qty], alignment=ft.MainAxisAlignment.CENTER), # Centra il contenuto
                     ft.ElevatedButton("AGGIUNGI", on_click=add_btn_click) 
-                ]), padding=10, border=ft.border.all(1, "grey"), border_radius=10, bgcolor="white"
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                
+                padding=15, # Aumentato il padding esterno
+                margin=ft.margin.symmetric(horizontal=10), # Margine laterale per non toccare i bordi schermo
+                border=ft.border.all(1, "grey"), 
+                border_radius=10, 
+                bgcolor="white"
             )
 
         try:
@@ -328,7 +343,8 @@ class ToysArmyApp:
             on_click=lambda _: self.show_summary()
         )
 
-        main_scroll_content = ft.Column(container_list, scroll="auto", expand=True)
+        # Centriamo anche la colonna principale
+        main_scroll_content = ft.Column(container_list, scroll="auto", expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
         self.page.add(
             ft.AppBar(
@@ -454,3 +470,4 @@ if __name__ == "__main__":
         ft.app(target=app.main, assets_dir="assets")
     else:
         ft.app(target=app.main)
+                    
