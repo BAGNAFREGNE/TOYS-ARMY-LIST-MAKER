@@ -124,7 +124,7 @@ class ToysArmyApp:
             list_column.controls.append(
                 ft.Container(
                     content=ft.Text("Nessuna lista salvata trovata.", size=18, weight="bold"),
-                    bgcolor="white", padding=10, border_radius=10
+                    bgcolor="white", padding=10, border_radius=10, width=300
                 )
             )
         else:
@@ -149,7 +149,8 @@ class ToysArmyApp:
                     padding=5,
                     bgcolor="white",
                     border_radius=10,
-                    border=ft.border.all(1, "grey")
+                    border=ft.border.all(1, "grey"),
+                    width=320 
                 )
                 list_column.controls.append(container)
 
@@ -181,7 +182,7 @@ class ToysArmyApp:
                 padding=15,
                 border_radius=10,
                 border=ft.border.all(1, "grey"),
-                width=350 
+                width=320
             )
 
             main_content = ft.Column([
@@ -253,7 +254,7 @@ class ToysArmyApp:
             self.page.snack_bar.open = True
             self.page.update()
 
-    # --- 7. UNITÀ (MODIFICATA PER IL MENÙ) ---
+    # --- 7. UNITÀ (COMPATTE E CENTRATE - FIXATO) ---
     def show_units(self):
         self.page.clean()
         container_list = []
@@ -268,21 +269,22 @@ class ToysArmyApp:
                     except: cost = 0
                     opts.append(ft.dropdown.Option(text=f"{name} ({cost})", key=name))
 
-            # MODIFICA DROPDOWN:
-            # - dense=True: rende la lista più compatta
-            # - text_size=14: rimpicciolisce il testo
-            # - content_padding=10: aggiusta lo spazio interno
+            # DROPDOWN ELASTICO
+            # - expand=True: occupa tutto lo spazio rimasto
+            # - dense=True: compatto
+            # - text_size=12: font più piccolo per farci stare i nomi lunghi
             dd = ft.Dropdown(
                 label="Seleziona", 
                 options=opts, 
-                expand=True, 
+                expand=True,        # ELASTICO: Risolve il problema del testo tagliato
                 bgcolor="white",
                 dense=True,         
-                text_size=14,       
-                content_padding=10  
+                text_size=12,       
+                content_padding=10
             )
             
-            qty = ft.TextField(value="1", label="Qta", width=60, bgcolor="white", text_size=14, content_padding=10)
+            # Campo quantità piccolo e fisso
+            qty = ft.TextField(value="1", label="Qta", width=50, bgcolor="white", text_size=12, content_padding=10)
             
             def add_btn_click(e):
                 self.add_item_logic(dd.value, qty.value, data, cost_idx)
@@ -291,19 +293,22 @@ class ToysArmyApp:
                 self.page.snack_bar.open = True
                 self.page.update()
 
-            # Aggiungiamo padding extra al container per centrare meglio il menù nello schermo
+            # CONTENITORE "CARD"
+            # alignment=ft.Alignment(0,0) -> CORRETTO (Non usa più ft.alignment.center)
             return ft.Container(
                 content=ft.Column([
-                    ft.Text(label, weight="bold"),
-                    ft.Row([dd, qty], alignment=ft.MainAxisAlignment.CENTER), # Centra il contenuto
+                    ft.Text(label, weight="bold", size=16),
+                    # La Row contiene il dropdown (che si espande) e la quantità
+                    ft.Row([dd, qty], alignment=ft.MainAxisAlignment.CENTER),
                     ft.ElevatedButton("AGGIUNGI", on_click=add_btn_click) 
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 
-                padding=15, # Aumentato il padding esterno
-                margin=ft.margin.symmetric(horizontal=10), # Margine laterale per non toccare i bordi schermo
+                width=320,  # Larghezza fissa per centratura
+                padding=10,
                 border=ft.border.all(1, "grey"), 
-                border_radius=10, 
-                bgcolor="white"
+                border_radius=15, 
+                bgcolor="white",
+                alignment=ft.Alignment(0, 0) # FIXATO!
             )
 
         try:
@@ -314,7 +319,7 @@ class ToysArmyApp:
         except Exception as e:
              self.page.add(ft.Text(f"Errore visualizzazione: {e}", color="red"))
 
-        comp_val = ft.TextField(label="Valore da sottrarre", width=150, keyboard_type=ft.KeyboardType.NUMBER, bgcolor="white")
+        comp_val = ft.TextField(label="Sconto", width=120, keyboard_type=ft.KeyboardType.NUMBER, bgcolor="white", text_size=12)
         
         def apply_comp_click(e):
             try:
@@ -331,9 +336,12 @@ class ToysArmyApp:
         container_list.append(
             ft.Container(
                 content=ft.Column([
-                    ft.Text("Compensazione / Sconti", weight="bold", color="red"),
+                    ft.Text("Sconti / Compensazione", weight="bold", color="red"),
                     ft.Row([comp_val, ft.ElevatedButton("APPLICA", on_click=apply_comp_click, color="white", bgcolor="red")])
-                ]), padding=10, border=ft.border.all(1, "red"), border_radius=10, margin=ft.margin.only(top=20), bgcolor="white"
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                width=320, 
+                padding=10, border=ft.border.all(1, "red"), border_radius=15, margin=ft.margin.only(top=20), bgcolor="white",
+                alignment=ft.Alignment(0, 0) # FIXATO ANCHE QUI
             )
         )
 
@@ -343,7 +351,7 @@ class ToysArmyApp:
             on_click=lambda _: self.show_summary()
         )
 
-        # Centriamo anche la colonna principale
+        # Colonna principale centrata
         main_scroll_content = ft.Column(container_list, scroll="auto", expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
         self.page.add(
@@ -442,16 +450,16 @@ class ToysArmyApp:
                 self.page.snack_bar.open = True
                 self.page.update()
 
-        name_field = ft.TextField(label="Nome Lista", value=self.list_name, on_change=lambda e: setattr(self, 'list_name', e.control.value), bgcolor="white")
+        name_field = ft.TextField(label="Nome Lista", value=self.list_name, on_change=lambda e: setattr(self, 'list_name', e.control.value), bgcolor="white", width=320)
 
         main_scroll_content = ft.Column([
                 name_field,
                 ft.Divider(),
-                ft.Container(content=items_col, border=ft.border.all(1, "grey"), border_radius=5, padding=5, bgcolor="white"),
+                ft.Container(content=items_col, border=ft.border.all(1, "grey"), border_radius=5, padding=5, bgcolor="white", width=320),
                 ft.Divider(),
                 total_label,
                 ft.ElevatedButton("SALVA LISTA", on_click=save_file, bgcolor="green", color="white")
-            ], scroll="auto", expand=True)
+            ], scroll="auto", expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
         self.page.add(
             ft.AppBar(
@@ -470,4 +478,3 @@ if __name__ == "__main__":
         ft.app(target=app.main, assets_dir="assets")
     else:
         ft.app(target=app.main)
-                    
