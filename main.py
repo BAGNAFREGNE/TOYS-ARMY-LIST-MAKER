@@ -254,7 +254,7 @@ class ToysArmyApp:
             self.page.snack_bar.open = True
             self.page.update()
 
-    # --- 7. UNITÀ (COMPATTE E CENTRATE - FIXATO) ---
+    # --- 7. UNITÀ (SCROLL SICURO + FIX) ---
     def show_units(self):
         self.page.clean()
         container_list = []
@@ -269,21 +269,19 @@ class ToysArmyApp:
                     except: cost = 0
                     opts.append(ft.dropdown.Option(text=f"{name} ({cost})", key=name))
 
-            # DROPDOWN ELASTICO
-            # - expand=True: occupa tutto lo spazio rimasto
-            # - dense=True: compatto
-            # - text_size=12: font più piccolo per farci stare i nomi lunghi
+            # --- DROPDOWN SICURO ---
+            # CORRETTO: Usiamo menu_height invece di max_menu_height
             dd = ft.Dropdown(
                 label="Seleziona", 
                 options=opts, 
-                expand=True,        # ELASTICO: Risolve il problema del testo tagliato
+                expand=True,        
                 bgcolor="white",
                 dense=True,         
-                text_size=12,       
-                content_padding=10
+                text_size=12,
+                content_padding=10,
+                menu_height=250 # <--- CORRETTO
             )
             
-            # Campo quantità piccolo e fisso
             qty = ft.TextField(value="1", label="Qta", width=50, bgcolor="white", text_size=12, content_padding=10)
             
             def add_btn_click(e):
@@ -293,22 +291,19 @@ class ToysArmyApp:
                 self.page.snack_bar.open = True
                 self.page.update()
 
-            # CONTENITORE "CARD"
-            # alignment=ft.Alignment(0,0) -> CORRETTO (Non usa più ft.alignment.center)
             return ft.Container(
                 content=ft.Column([
                     ft.Text(label, weight="bold", size=16),
-                    # La Row contiene il dropdown (che si espande) e la quantità
                     ft.Row([dd, qty], alignment=ft.MainAxisAlignment.CENTER),
                     ft.ElevatedButton("AGGIUNGI", on_click=add_btn_click) 
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 
-                width=320,  # Larghezza fissa per centratura
+                width=320,  
                 padding=10,
                 border=ft.border.all(1, "grey"), 
                 border_radius=15, 
                 bgcolor="white",
-                alignment=ft.Alignment(0, 0) # FIXATO!
+                alignment=ft.Alignment(0, 0)
             )
 
         try:
@@ -341,7 +336,7 @@ class ToysArmyApp:
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 width=320, 
                 padding=10, border=ft.border.all(1, "red"), border_radius=15, margin=ft.margin.only(top=20), bgcolor="white",
-                alignment=ft.Alignment(0, 0) # FIXATO ANCHE QUI
+                alignment=ft.Alignment(0, 0)
             )
         )
 
@@ -351,7 +346,6 @@ class ToysArmyApp:
             on_click=lambda _: self.show_summary()
         )
 
-        # Colonna principale centrata
         main_scroll_content = ft.Column(container_list, scroll="auto", expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
         self.page.add(
