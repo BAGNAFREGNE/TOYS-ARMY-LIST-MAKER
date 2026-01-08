@@ -52,7 +52,7 @@ class ToysArmyApp:
         self.show_home()
 
     def handle_back_event(self, e):
-        # Gestione centralizzata del tasto fisico indietro
+        # Gestione Tasto Fisico
         if self.current_view == "home":
             return False 
         elif self.current_view == "saved_lists":
@@ -65,11 +65,13 @@ class ToysArmyApp:
         elif self.current_view == "units":
             self.show_faction()
         elif self.current_view == "summary":
-            # FIX LOGICA: Se vengo dalle unità torno lì, altrimenti torno alle liste salvate
-            if self.coming_from == "units":
+            # FIX LOGICA INDIETRO
+            if self.coming_from == "saved_lists":
+                self.show_saved_lists()
+            elif self.coming_from == "units":
                 self.show_units()
             else:
-                self.show_saved_lists()
+                self.show_home() # Fallback
         return True 
 
     # --- 3. HELPER EXCEL ---
@@ -106,7 +108,7 @@ class ToysArmyApp:
             return ft.ElevatedButton(text=fallback_text, on_click=action, bgcolor=color, color="white")
 
     # --- 5. LAYOUT ---
-    def build_page(self, title_text, main_content, leading_btn=None, footer_content=None):
+    def build_page(self, title_text, main_content, leading_btn=None, footer_content=None, content_alignment=ft.Alignment(0, -1)):
         
         header_row = ft.Row([
             leading_btn if leading_btn else ft.Container(width=40),
@@ -123,7 +125,7 @@ class ToysArmyApp:
 
         header_container = ft.Container(
             content=header_row,
-            padding=ft.padding.only(top=10, left=10, right=10, bottom=10),
+            padding=ft.padding.only(top=45, left=10, right=10, bottom=10),
             bgcolor="#4D000000", 
         )
 
@@ -131,6 +133,7 @@ class ToysArmyApp:
             content=main_content, 
             expand=True,          
             padding=5,
+            alignment=content_alignment 
         )
 
         foreground_column = ft.Column([
@@ -173,9 +176,13 @@ class ToysArmyApp:
                 
                 ft.ElevatedButton("LISTE SALVATE", on_click=lambda _: self.show_saved_lists(), height=60, width=200, bgcolor="orange", color="white", style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5))),
                 
-            ], alignment="center", horizontal_alignment="center", spacing=20)
+            ], 
+            alignment="center", 
+            horizontal_alignment="center", 
+            spacing=20,
+        )
 
-        self.page.add(self.build_page("TOYS ARMY MENU", main_content))
+        self.page.add(self.build_page("TOYS ARMY MENU", main_content, content_alignment=ft.Alignment(0, 0)))
         self.page.update()
 
     # --- VISUALIZZA LISTE SALVATE ---
@@ -234,7 +241,6 @@ class ToysArmyApp:
                 )
                 list_view.controls.append(container)
 
-        # LOGICA TASTO INDIETRO (DENTRO LISTE SALVATE)
         if self.coming_from == "units":
              back_action = lambda _: self.show_units()
         else:
@@ -303,19 +309,25 @@ class ToysArmyApp:
             self.total_cost = temp_cost
             self.list_name = temp_name
             
-            if temp_faction:
-                self.faction = temp_faction
-                self.alliance = temp_alliance
-
-            # === LOGICA DI NAVIGAZIONE DOPO CARICAMENTO ===
+            # === LOGICA DI NAVIGAZIONE CRUCIALE ===
             
+            # 1. Se stavo lavorando su un esercito (es. ho cliccato CARICA mentre facevo una lista)
             if self.coming_from == "units":
-                # Se stavo lavorando su un esercito e carico una lista, ricarico quell'esercito
+                if temp_faction:
+                    self.faction = temp_faction
+                    self.alliance = temp_alliance
                 self.load_data(self.faction)
                 
+            # 2. Se vengo dalla Home (es. Archivio Liste)
             else:
-                # Se vengo dalla Home o dall'Archivio, vado al Riepilogo
-                # E importante: NON cambio 'coming_from', così il riepilogo saprà che deve tornare all'archivio
+                # FIX QUI: Forziamo la provenienza su "saved_lists"
+                # Così il tasto back saprà di dover tornare alle liste, non alla home o agli eserciti
+                self.coming_from = "saved_lists"
+                
+                if temp_faction:
+                    self.faction = temp_faction
+                    self.alliance = temp_alliance
+                
                 self.show_summary()
 
             self.page.snack_bar = ft.SnackBar(ft.Text(f"Caricata: {self.list_name}", font_family="Courier New"), bgcolor="green")
@@ -343,7 +355,7 @@ class ToysArmyApp:
         self.alliance = alliance
         self.show_faction()
 
-    # --- 6. FAZIONE ---
+    # --- 6. FAZIONE (CENTRATA) ---
     def show_faction(self):
         self.current_view = "faction"
         self.page.clean()
@@ -353,10 +365,15 @@ class ToysArmyApp:
         for f in factions:
             buttons.append(ft.ElevatedButton(f.upper(), on_click=lambda e, x=f: self.load_data(x), height=50, width=280, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5))))
 
-        main_content = ft.Column(buttons, alignment="center", horizontal_alignment="center", spacing=20)
+        main_content = ft.Column(
+            buttons, 
+            alignment="center", 
+            horizontal_alignment="center", 
+            spacing=20,
+        )
 
         back_btn = self.get_smart_button("Back.png", "<", lambda _: self.show_home())
-        self.page.add(self.build_page(self.alliance, main_content, back_btn))
+        self.page.add(self.build_page(self.alliance, main_content, back_btn, content_alignment=ft.Alignment(0, 0)))
         self.page.update()
 
     def load_data(self, faction):
@@ -603,12 +620,9 @@ class ToysArmyApp:
             save_btn = ft.ElevatedButton("SALVA LISTA", on_click=save_file, bgcolor="green", color="white", style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=2)))
             list_view.controls.append(ft.Container(content=save_btn, alignment=ft.Alignment(0, 0)))
             
-            # --- TASTO SPECIALE AGGIUNGI PEZZI (SOLO SE VENGO DA HOME) ---
-            # Se la lista ha una fazione ma non vengo da 'units' (quindi sono in sola lettura),
-            # mostro il tasto per andare a modificare.
             if self.coming_from != "units" and self.faction:
                 def go_to_edit_mode(e):
-                    self.coming_from = "units" # Setto la modalità modifica
+                    self.coming_from = "units" 
                     self.load_data(self.faction) 
                 
                 edit_btn = ft.ElevatedButton("AGGIUNGI PEZZI", on_click=go_to_edit_mode, bgcolor="blue", color="white", style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=2)))
@@ -654,11 +668,11 @@ class ToysArmyApp:
 
         refresh_list_view()
 
-        # LOGICA TASTO INDIETRO NEL RIEPILOGO
-        if self.coming_from == "units":
-            back_action = lambda _: self.show_units()
-        else:
+        # LOGICA BACK SUMMARY
+        if self.coming_from == "saved_lists":
             back_action = lambda _: self.show_saved_lists()
+        else:
+            back_action = lambda _: self.show_units()
             
         back_btn = self.get_smart_button("Back.png", "<", back_action)
         self.page.add(self.build_page("RIEPILOGO", list_view, back_btn))
