@@ -3,6 +3,7 @@ import openpyxl
 import os
 import warnings
 import time
+import re
 
 warnings.filterwarnings("ignore")
 
@@ -28,22 +29,48 @@ class ToysArmyApp:
                  self.file_path = "assets/Dati ToysArmy.xlsx"
 
         # --- 2. VARIABILI ---
-        self.list_name = "Lista_senza_nome"
+        self.list_name = "Nuova_Lista"
         self.selected_units = [] 
         self.compensations = [] 
         self.total_cost = 0.0
         self.alliance = ""
-        self.faction = ""
+        self.faction = "" 
+        
+        self.current_view = "home" 
+        self.coming_from = "home" 
         
         self.bg_image = "background.jpg" 
 
     def main(self, page: ft.Page):
         self.page = page
         self.page.title = "Toys Army"
-        self.page.theme_mode = ft.ThemeMode.LIGHT
+        self.page.theme_mode = "light" 
         self.page.padding = 0 
         
+        self.page.on_back_button = self.handle_back_event
+        
         self.show_home()
+
+    def handle_back_event(self, e):
+        # Gestione centralizzata del tasto fisico indietro
+        if self.current_view == "home":
+            return False 
+        elif self.current_view == "saved_lists":
+            if self.coming_from == "units":
+                self.show_units()
+            else:
+                self.show_home()
+        elif self.current_view == "faction":
+            self.show_home()
+        elif self.current_view == "units":
+            self.show_faction()
+        elif self.current_view == "summary":
+            # FIX LOGICA: Se vengo dalle unità torno lì, altrimenti torno alle liste salvate
+            if self.coming_from == "units":
+                self.show_units()
+            else:
+                self.show_saved_lists()
+        return True 
 
     # --- 3. HELPER EXCEL ---
     def get_excel_data(self, sheet_name):
@@ -69,7 +96,7 @@ class ToysArmyApp:
         
         if os.path.exists(image_full_path):
             return ft.Container(
-                content=ft.Image(src=image_name, width=size, height=size, fit="contain"),
+                content=ft.Image(src=image_name, width=size, height=size, fit="contain"), 
                 on_click=action,
                 padding=5,
                 border_radius=5,
@@ -78,62 +105,116 @@ class ToysArmyApp:
         else:
             return ft.ElevatedButton(text=fallback_text, on_click=action, bgcolor=color, color="white")
 
-    # --- HELPER SFONDO ---
-    def wrap_with_bg(self, content_column):
-        return ft.Container(
-            image=ft.DecorationImage(
-                src=self.bg_image,
-                fit="cover",
-                opacity=0.9,
-                alignment=ft.Alignment(0, 0)
+    # --- 5. LAYOUT ---
+    def build_page(self, title_text, main_content, leading_btn=None, footer_content=None):
+        
+        header_row = ft.Row([
+            leading_btn if leading_btn else ft.Container(width=40),
+            ft.Text(
+                title_text.upper(),
+                font_family="Courier New",
+                weight="bold", 
+                size=24,
+                color="white",
+                text_align="center"
             ),
-            expand=True,
-            padding=10,
-            content=content_column,
-            alignment=ft.Alignment(0, 0)
+            ft.Container(width=40) 
+        ], alignment="spaceBetween", vertical_alignment="center") 
+
+        header_container = ft.Container(
+            content=header_row,
+            padding=ft.padding.only(top=10, left=10, right=10, bottom=10),
+            bgcolor="#4D000000", 
         )
 
-    # --- 5. HOME ---
+        body_container = ft.Container(
+            content=main_content, 
+            expand=True,          
+            padding=5,
+        )
+
+        foreground_column = ft.Column([
+            header_container,
+            body_container
+        ], expand=True, spacing=0)
+
+        if footer_content:
+            foreground_column.controls.append(footer_content)
+
+        return ft.Stack([
+            ft.Image(
+                src=self.bg_image,
+                fit="cover", 
+                width=float("inf"),
+                height=float("inf"),
+                opacity=0.9,
+                expand=True
+            ),
+            foreground_column
+        ], expand=True)
+
+    # --- 6. HOME ---
     def show_home(self):
+        self.current_view = "home"
         self.page.clean()
+        self.coming_from = "home"
+        
+        self.list_name = "Nuova_Lista"
+        self.selected_units = []
+        self.compensations = []
+        self.total_cost = 0.0
+        self.faction = "" 
         
         main_content = ft.Column([
-                ft.ElevatedButton("Asse", on_click=lambda _: self.select_alliance("Asse"), height=60, width=200),
-                ft.ElevatedButton("Alleati", on_click=lambda _: self.select_alliance("Alleati"), height=60, width=200),
+                ft.Container(height=40),
+                ft.ElevatedButton("ASSE", on_click=lambda _: self.select_alliance("Asse"), height=60, width=200, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5))),
+                ft.ElevatedButton("ALLEATI", on_click=lambda _: self.select_alliance("Alleati"), height=60, width=200, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5))),
                 ft.Container(height=20),
                 
-                ft.ElevatedButton("LISTE SALVATE", on_click=lambda _: self.show_saved_lists(), height=60, width=200, bgcolor="orange", color="white"),
+                ft.ElevatedButton("LISTE SALVATE", on_click=lambda _: self.show_saved_lists(), height=60, width=200, bgcolor="orange", color="white", style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5))),
                 
-            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=20, expand=True)
+            ], alignment="center", horizontal_alignment="center", spacing=20)
 
-        self.page.add(
-            ft.AppBar(title=ft.Text("Toys Army Menu"), bgcolor="blue", color="white"),
-            self.wrap_with_bg(main_content)
-        )
+        self.page.add(self.build_page("TOYS ARMY MENU", main_content))
         self.page.update()
 
     # --- VISUALIZZA LISTE SALVATE ---
     def show_saved_lists(self):
+        self.current_view = "saved_lists"
         self.page.clean()
         
-        files = [f for f in os.listdir(self.exe_path) if f.endswith(".txt") and f != "requirements.txt"]
+        all_files = [f for f in os.listdir(self.exe_path) if f.endswith(".txt") and f != "requirements.txt"]
+        filtered_files = []
+
+        if self.coming_from == "units" and self.faction != "":
+            target_faction_line = f"Fazione: {self.faction}"
+            for f in all_files:
+                try:
+                    with open(os.path.join(self.exe_path, f), "r", encoding="utf-8") as file_obj:
+                        content = file_obj.read()
+                        if target_faction_line in content:
+                            filtered_files.append(f)
+                except: pass
+        else:
+            filtered_files = all_files
+
+        list_view = ft.ListView(expand=True, spacing=10, padding=10)
         
-        list_column = ft.Column(spacing=10, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
-        
-        if not files:
-            list_column.controls.append(
+        if not filtered_files:
+            msg = "Nessuna lista trovata per questa fazione." if self.coming_from == "units" else "Nessuna lista salvata."
+            list_view.controls.append(
                 ft.Container(
-                    content=ft.Text("Nessuna lista salvata trovata.", size=18, weight="bold"),
-                    bgcolor="white", padding=10, border_radius=10, width=300
+                    content=ft.Text(msg, size=16, weight="bold", font_family="Courier New", text_align="center"),
+                    bgcolor="white", padding=10, border_radius=10, alignment=ft.Alignment(0, 0)
                 )
             )
         else:
-            for filename in files:
+            for filename in filtered_files:
                 safe_name = filename.replace(".txt", "")
                 
                 btn_open = ft.Container(
-                    content=ft.Text(safe_name, color="blue", size=18, weight="bold"),
-                    on_click=lambda e, f=filename: self.open_list_screen(f),
+                    content=ft.Text(safe_name, color="black", size=18, weight="bold", font_family="Courier New"),
+                    on_click=lambda e, f=filename: self.load_and_edit_list(f),
                     padding=10,
                     ink=True, 
                     border_radius=5
@@ -142,65 +223,107 @@ class ToysArmyApp:
                 row = ft.Row([
                     btn_open,
                     self.get_smart_button("Cancel.png", "X", lambda e, f=filename: self.delete_list(f), color="red", size=25)
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                ], alignment="spaceBetween")
                 
                 container = ft.Container(
                     content=row,
                     padding=5,
                     bgcolor="white",
-                    border_radius=10,
-                    border=ft.border.all(1, "grey"),
-                    width=320 
+                    border_radius=5,
+                    border=ft.border.all(2, "black")
                 )
-                list_column.controls.append(container)
+                list_view.controls.append(container)
 
-        self.page.add(
-            ft.AppBar(
-                title=ft.Text("Liste Salvate"), 
-                bgcolor="blue", color="white",
-                leading=self.get_smart_button("Back.png", "<", lambda _: self.show_home())
-            ),
-            self.wrap_with_bg(ft.Column([list_column], scroll="auto", expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER))
-        )
+        # LOGICA TASTO INDIETRO (DENTRO LISTE SALVATE)
+        if self.coming_from == "units":
+             back_action = lambda _: self.show_units()
+        else:
+             back_action = lambda _: self.show_home()
+
+        back_btn = self.get_smart_button("Back.png", "<", back_action)
+        
+        title_page = self.faction.upper() if self.coming_from == "units" else "ARCHIVIO LISTE"
+        self.page.add(self.build_page(title_page, list_view, back_btn))
         self.page.update()
 
-    # --- NUOVA SCHERMATA: LEGGI LISTA ---
-    def open_list_screen(self, filename):
+    # --- LOGICA CARICAMENTO ---
+    def load_and_edit_list(self, filename):
         try:
             full_path = os.path.join(self.exe_path, filename)
-            content = ""
+            
+            temp_units = []
+            temp_comp = []
+            temp_cost = 0.0
+            temp_faction = ""
+            temp_alliance = ""
+            temp_name = filename.replace(".txt", "")
+
             with open(full_path, "r", encoding="utf-8") as f:
-                content = f.read()
+                lines = f.readlines()
             
-            if not content: content = "Il file è vuoto."
+            reading_sconti = False
+            
+            for line in lines:
+                line = line.strip()
+                if not line: continue
+                
+                if line.startswith("Nome Lista:"): pass 
+                elif line.startswith("Totale Costo:"): pass
+                elif line.startswith("Fazione:"): 
+                    temp_faction = line.split(":")[1].strip()
+                elif line.startswith("Alleanza:"):
+                    temp_alliance = line.split(":")[1].strip()
+                    
+                elif line.startswith("--- SCONTI ---"): reading_sconti = True
+                elif line.startswith("--- ELENCO"): reading_sconti = False
+                else:
+                    if reading_sconti:
+                        if line.startswith("- "):
+                            try:
+                                val = float(line.replace("- ", ""))
+                                temp_comp.append(val)
+                                temp_cost -= val
+                            except: pass
+                    else:
+                        match = re.match(r"^(.*?) x(\d+) \(([\d\.]+)\)$", line)
+                        if match:
+                            name = match.group(1)
+                            qty = int(match.group(2))
+                            cost = float(match.group(3))
+                            
+                            temp_units.append({
+                                'id': time.time() + len(temp_units), 
+                                'text': line,
+                                'cost': cost
+                            })
+                            temp_cost += cost
 
-            self.page.clean()
+            self.selected_units = temp_units
+            self.compensations = temp_comp
+            self.total_cost = temp_cost
+            self.list_name = temp_name
+            
+            if temp_faction:
+                self.faction = temp_faction
+                self.alliance = temp_alliance
 
-            text_container = ft.Container(
-                content=ft.Text(content, size=16, color="black", weight="w500"),
-                bgcolor="white",
-                padding=15,
-                border_radius=10,
-                border=ft.border.all(1, "grey"),
-                width=320
-            )
+            # === LOGICA DI NAVIGAZIONE DOPO CARICAMENTO ===
+            
+            if self.coming_from == "units":
+                # Se stavo lavorando su un esercito e carico una lista, ricarico quell'esercito
+                self.load_data(self.faction)
+                
+            else:
+                # Se vengo dalla Home o dall'Archivio, vado al Riepilogo
+                # E importante: NON cambio 'coming_from', così il riepilogo saprà che deve tornare all'archivio
+                self.show_summary()
 
-            main_content = ft.Column([
-                text_container
-            ], scroll="auto", alignment=ft.MainAxisAlignment.START, horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True)
-
-            self.page.add(
-                ft.AppBar(
-                    title=ft.Text(filename.replace(".txt", "")), 
-                    bgcolor="blue", color="white",
-                    leading=self.get_smart_button("Back.png", "<", lambda _: self.show_saved_lists())
-                ),
-                self.wrap_with_bg(main_content)
-            )
+            self.page.snack_bar = ft.SnackBar(ft.Text(f"Caricata: {self.list_name}", font_family="Courier New"), bgcolor="green")
+            self.page.snack_bar.open = True
             self.page.update()
-            
+
         except Exception as e:
-            self.page.snack_bar = ft.SnackBar(ft.Text(f"Errore apertura: {str(e)}"), bgcolor="red")
+            self.page.snack_bar = ft.SnackBar(ft.Text(f"Errore: {str(e)}"), bgcolor="red")
             self.page.snack_bar.open = True
             self.page.update()
 
@@ -208,7 +331,7 @@ class ToysArmyApp:
         try:
             full_path = os.path.join(self.exe_path, filename)
             os.remove(full_path)
-            self.page.snack_bar = ft.SnackBar(ft.Text(f"Lista {filename} eliminata!"), bgcolor="green")
+            self.page.snack_bar = ft.SnackBar(ft.Text(f"Eliminata!"), bgcolor="green")
             self.page.snack_bar.open = True
             self.show_saved_lists()
         except Exception as e:
@@ -220,25 +343,20 @@ class ToysArmyApp:
         self.alliance = alliance
         self.show_faction()
 
-    # --- 6. FAZIONE (CENTRATA) ---
+    # --- 6. FAZIONE ---
     def show_faction(self):
+        self.current_view = "faction"
         self.page.clean()
         factions = ["Unione Sovietica", "Stati Uniti d'America", "Regno Unito"] if self.alliance == "Alleati" else ["Terzo Reich", "Impero Giapponese", "Regno D'Italia"]
         
         buttons = []
         for f in factions:
-            buttons.append(ft.ElevatedButton(f, on_click=lambda e, x=f: self.load_data(x), height=50, width=250))
+            buttons.append(ft.ElevatedButton(f.upper(), on_click=lambda e, x=f: self.load_data(x), height=50, width=280, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5))))
 
-        main_content = ft.Column(buttons, alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=20, expand=True)
+        main_content = ft.Column(buttons, alignment="center", horizontal_alignment="center", spacing=20)
 
-        self.page.add(
-            ft.AppBar(
-                title=ft.Text(f"{self.alliance}"), 
-                bgcolor="blue", color="white", 
-                leading=self.get_smart_button("Back.png", "<", lambda _: self.show_home())
-            ),
-            self.wrap_with_bg(main_content)
-        )
+        back_btn = self.get_smart_button("Back.png", "<", lambda _: self.show_home())
+        self.page.add(self.build_page(self.alliance, main_content, back_btn))
         self.page.update()
 
     def load_data(self, faction):
@@ -248,14 +366,21 @@ class ToysArmyApp:
             self.roles_data = self.get_excel_data(f"Ruoli {faction}")
             self.tank_data = self.get_excel_data(f"Tank {faction}")
             self.mod_tank_data = self.get_excel_data(f"Mod Tank {faction}")
+            
+            if self.coming_from != "units" and self.coming_from != "saved_lists" and self.list_name == "Nuova_Lista":
+                 self.selected_units = []
+                 self.compensations = []
+                 self.total_cost = 0.0
+            
             self.show_units()
         except Exception as e:
             self.page.snack_bar = ft.SnackBar(ft.Text(f"Errore Dati: {str(e)}"), bgcolor="red")
             self.page.snack_bar.open = True
             self.page.update()
 
-    # --- 7. UNITÀ (SCROLL SICURO + FIX) ---
+    # --- 7. UNITÀ ---
     def show_units(self):
+        self.current_view = "units"
         self.page.clean()
         container_list = []
         
@@ -264,13 +389,10 @@ class ToysArmyApp:
             for row in data:
                 if row[0] is not None:
                     name = str(row[0])
-                    try: 
-                        cost = row[cost_idx] if row[cost_idx] is not None else 0
+                    try: cost = row[cost_idx] if row[cost_idx] is not None else 0
                     except: cost = 0
                     opts.append(ft.dropdown.Option(text=f"{name} ({cost})", key=name))
 
-            # --- DROPDOWN SICURO ---
-            # CORRETTO: Usiamo menu_height invece di max_menu_height
             dd = ft.Dropdown(
                 label="Seleziona", 
                 options=opts, 
@@ -279,29 +401,32 @@ class ToysArmyApp:
                 dense=True,         
                 text_size=12,
                 content_padding=10,
-                menu_height=250 # <--- CORRETTO
+                menu_height=250 
             )
             
-            qty = ft.TextField(value="1", label="Qta", width=50, bgcolor="white", text_size=12, content_padding=10)
+            qty = ft.TextField(
+                value="1", label="Qta", width=50, bgcolor="white", 
+                text_size=12, content_padding=10, keyboard_type="number"
+            )
             
             def add_btn_click(e):
                 self.add_item_logic(dd.value, qty.value, data, cost_idx)
                 dd.value = None
-                self.page.snack_bar = ft.SnackBar(ft.Text("Aggiunto!"))
+                self.page.snack_bar = ft.SnackBar(ft.Text("Aggiunto!", font_family="Courier New"))
                 self.page.snack_bar.open = True
                 self.page.update()
 
             return ft.Container(
                 content=ft.Column([
-                    ft.Text(label, weight="bold", size=16),
-                    ft.Row([dd, qty], alignment=ft.MainAxisAlignment.CENTER),
-                    ft.ElevatedButton("AGGIUNGI", on_click=add_btn_click) 
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Text(label.upper(), weight="bold", size=16, font_family="Courier New"), 
+                    ft.Row([dd, qty], alignment="center"), 
+                    ft.ElevatedButton("AGGIUNGI", on_click=add_btn_click, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=2))) 
+                ], horizontal_alignment="center"), 
                 
                 width=320,  
                 padding=10,
-                border=ft.border.all(1, "grey"), 
-                border_radius=15, 
+                border=ft.border.all(1, "black"),
+                border_radius=5,
                 bgcolor="white",
                 alignment=ft.Alignment(0, 0)
             )
@@ -312,9 +437,9 @@ class ToysArmyApp:
             container_list.append(make_block("Tank", self.tank_data, 8, [1]))
             container_list.append(make_block("Modifiche", self.mod_tank_data, 3, [1]))
         except Exception as e:
-             self.page.add(ft.Text(f"Errore visualizzazione: {e}", color="red"))
+             self.page.add(ft.Text(f"Errore: {e}", color="red"))
 
-        comp_val = ft.TextField(label="Sconto", width=120, keyboard_type=ft.KeyboardType.NUMBER, bgcolor="white", text_size=12)
+        comp_val = ft.TextField(label="Sconto", width=120, keyboard_type="number", bgcolor="white", text_size=12)
         
         def apply_comp_click(e):
             try:
@@ -322,7 +447,7 @@ class ToysArmyApp:
                 self.compensations.append(val)
                 self.total_cost -= val
                 comp_val.value = ""
-                self.page.snack_bar = ft.SnackBar(ft.Text(f"Sottratto: {val}"))
+                self.page.snack_bar = ft.SnackBar(ft.Text(f"Sottratto: {val}", font_family="Courier New"))
                 self.page.snack_bar.open = True
                 self.page.update()
             except:
@@ -331,32 +456,90 @@ class ToysArmyApp:
         container_list.append(
             ft.Container(
                 content=ft.Column([
-                    ft.Text("Sconti / Compensazione", weight="bold", color="red"),
+                    ft.Text("SCONTI / COMP.", weight="bold", color="red", font_family="Courier New"),
                     ft.Row([comp_val, ft.ElevatedButton("APPLICA", on_click=apply_comp_click, color="white", bgcolor="red")])
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                ], horizontal_alignment="center"), 
                 width=320, 
-                padding=10, border=ft.border.all(1, "red"), border_radius=15, margin=ft.margin.only(top=20), bgcolor="white",
+                padding=10, border=ft.border.all(1, "red"), border_radius=5, margin=ft.margin.only(top=20), bgcolor="white",
                 alignment=ft.Alignment(0, 0)
             )
         )
+        
+        container_list.append(ft.Container(height=20))
 
-        fab = ft.FloatingActionButton(
-            content=ft.Text("LISTA", weight="bold"),
-            width=80,
-            on_click=lambda _: self.show_summary()
+        # --- FOOTER ---
+        status_text = f"MODIFICA: {self.list_name}" if self.list_name != "Nuova_Lista" else "NUOVA LISTA"
+        status_col = "orange" if self.list_name != "Nuova_Lista" else "green"
+        
+        lbl_status = ft.Container(
+            content=ft.Text(status_text, color=status_col, weight="bold", font_family="Courier New", size=12),
+            padding=5,
+            bgcolor="#cc000000",
+            border_radius=5,
+            alignment=ft.Alignment(0, 0)
         )
 
-        main_scroll_content = ft.Column(container_list, scroll="auto", expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+        def prep_load():
+            self.coming_from = "units"
+            self.show_saved_lists()
 
-        self.page.add(
-            ft.AppBar(
-                title=ft.Text(self.faction), 
-                bgcolor="blue", color="white",
-                leading=self.get_smart_button("Back.png", "<", lambda _: self.show_faction())
-            ),
-            self.wrap_with_bg(main_scroll_content),
-            fab
+        btn_carica = ft.FloatingActionButton(
+            content=ft.Text("CARICA", weight="bold", font_family="Courier New", size=12),
+            width=70,
+            height=40,
+            bgcolor="orange",
+            on_click=lambda _: prep_load()
         )
+
+        def reset_data_click(e):
+            self.list_name = "Nuova_Lista"
+            self.selected_units = []
+            self.compensations = []
+            self.total_cost = 0.0
+            self.show_units() 
+            self.page.snack_bar = ft.SnackBar(ft.Text("Lista resettata!", font_family="Courier New"))
+            self.page.snack_bar.open = True
+            self.page.update()
+
+        btn_nuova = ft.FloatingActionButton(
+            content=ft.Text("NUOVA", weight="bold", font_family="Courier New", size=12),
+            width=70,
+            height=40,
+            bgcolor="blue",
+            on_click=reset_data_click
+        )
+
+        def go_to_summary_from_units(e):
+            self.coming_from = "units"
+            self.show_summary()
+
+        btn_lista = ft.FloatingActionButton(
+            content=ft.Text("LISTA", weight="bold", font_family="Courier New", size=12),
+            width=70,
+            height=40,
+            bgcolor="green",
+            on_click=go_to_summary_from_units
+        )
+
+        footer_content = ft.Container(
+            content=ft.Column([
+                lbl_status,
+                ft.Row([btn_carica, btn_nuova, btn_lista], alignment="spaceBetween", width=320)
+            ], horizontal_alignment="center", spacing=10),
+            padding=ft.padding.only(left=20, right=20, bottom=20, top=10),
+            bgcolor=None 
+        )
+
+        main_scroll = ft.ListView(
+            controls=container_list, 
+            expand=True, 
+            spacing=15,
+            padding=20
+        )
+        
+        back_btn = self.get_smart_button("Back.png", "<", lambda _: self.show_faction())
+        
+        self.page.add(self.build_page(self.faction, main_scroll, back_btn, footer_content=footer_content))
         self.page.update()
 
     def add_item_logic(self, name, qty_str, data, cost_idx):
@@ -367,8 +550,7 @@ class ToysArmyApp:
         cost = 0
         for row in data:
             if str(row[0]) == name:
-                try: 
-                    cost = float(row[cost_idx])
+                try: cost = float(row[cost_idx])
                 except: cost = 0
                 break
         
@@ -378,33 +560,60 @@ class ToysArmyApp:
 
     # --- 8. RIEPILOGO ---
     def show_summary(self):
+        self.current_view = "summary"
         self.page.clean()
-        items_col = ft.Column()
+        
+        list_view = ft.ListView(expand=True, spacing=10, padding=10)
 
         def refresh_list_view():
-            items_col.controls.clear()
+            list_view.controls.clear()
+            
+            name_field = ft.TextField(label="NOME LISTA", value=self.list_name, on_change=lambda e: setattr(self, 'list_name', e.control.value), bgcolor="white", width=320, text_style=ft.TextStyle(font_family="Courier New"))
+            list_view.controls.append(ft.Container(content=name_field, alignment=ft.Alignment(0, 0))) 
+            list_view.controls.append(ft.Divider(color="black"))
+
+            items_col = ft.Column()
             
             if not self.selected_units and not self.compensations:
-                items_col.controls.append(ft.Text("Lista vuota"))
+                items_col.controls.append(ft.Text("LISTA VUOTA", font_family="Courier New"))
             
             for u in self.selected_units:
                 row = ft.Row([
-                    ft.Text(u['text'], expand=True),
+                    ft.Text(u['text'], expand=True, font_family="Courier New", weight="bold"),
                     self.get_smart_button("Cancel.png", "X", lambda e, x=u: remove_unit(x), color="red", size=25)
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                ], alignment="spaceBetween") 
                 items_col.controls.append(row)
 
             if self.compensations:
-                items_col.controls.append(ft.Divider())
-                items_col.controls.append(ft.Text("Sconti:", italic=True, color="red"))
+                items_col.controls.append(ft.Divider(color="black"))
+                items_col.controls.append(ft.Text("SCONTI:", italic=True, color="red", font_family="Courier New"))
                 for c in self.compensations:
                     row = ft.Row([
-                        ft.Text(f"- {c}", color="red", expand=True),
+                        ft.Text(f"- {c}", color="red", expand=True, font_family="Courier New"),
                         self.get_smart_button("Cancel.png", "X", lambda e, x=c: remove_comp(x), color="red", size=25)
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                    ], alignment="spaceBetween") 
                     items_col.controls.append(row)
             
-            total_label.value = f"TOTALE: {self.total_cost:.2f}"
+            list_view.controls.append(ft.Container(content=items_col, border=ft.border.all(2, "black"), border_radius=5, padding=5, bgcolor="white"))
+            list_view.controls.append(ft.Divider(color="black"))
+            
+            total_label = ft.Text(f"TOTALE: {self.total_cost:.2f}", size=25, weight="bold", color="black", font_family="Courier New", bgcolor="white")
+            list_view.controls.append(ft.Container(content=total_label, alignment=ft.Alignment(0, 0)))
+            
+            save_btn = ft.ElevatedButton("SALVA LISTA", on_click=save_file, bgcolor="green", color="white", style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=2)))
+            list_view.controls.append(ft.Container(content=save_btn, alignment=ft.Alignment(0, 0)))
+            
+            # --- TASTO SPECIALE AGGIUNGI PEZZI (SOLO SE VENGO DA HOME) ---
+            # Se la lista ha una fazione ma non vengo da 'units' (quindi sono in sola lettura),
+            # mostro il tasto per andare a modificare.
+            if self.coming_from != "units" and self.faction:
+                def go_to_edit_mode(e):
+                    self.coming_from = "units" # Setto la modalità modifica
+                    self.load_data(self.faction) 
+                
+                edit_btn = ft.ElevatedButton("AGGIUNGI PEZZI", on_click=go_to_edit_mode, bgcolor="blue", color="white", style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=2)))
+                list_view.controls.append(ft.Container(content=edit_btn, alignment=ft.Alignment(0, 0), margin=ft.margin.only(top=10)))
+
             self.page.update()
 
         def remove_unit(unit_obj):
@@ -417,9 +626,6 @@ class ToysArmyApp:
             self.total_cost += comp_val
             refresh_list_view()
 
-        total_label = ft.Text(f"TOTALE: {self.total_cost:.2f}", size=25, weight="bold", color="blue", bgcolor="white")
-        refresh_list_view()
-
         def save_file(e):
             try:
                 safe_name = "".join([c for c in self.list_name if c.isalnum() or c in (' ', '_')]).strip()
@@ -429,6 +635,8 @@ class ToysArmyApp:
                 
                 with open(full_path, "w", encoding="utf-8") as f:
                     f.write(f"Nome Lista: {self.list_name}\n")
+                    f.write(f"Fazione: {self.faction}\n") 
+                    f.write(f"Alleanza: {self.alliance}\n")
                     f.write(f"Totale Costo: {self.total_cost}\n\n")
                     f.write("--- ELENCO UNITÀ ---\n")
                     for u in self.selected_units: f.write(u['text'] + "\n")
@@ -436,7 +644,7 @@ class ToysArmyApp:
                         f.write("\n--- SCONTI ---\n")
                         for c in self.compensations: f.write(f"- {c}\n")
                         
-                self.page.snack_bar = ft.SnackBar(ft.Text(f"Salvato in: {filename}"), bgcolor="green", duration=4000)
+                self.page.snack_bar = ft.SnackBar(ft.Text(f"SALVATO: {filename}", font_family="Courier New"), bgcolor="green", duration=4000)
                 self.page.snack_bar.open = True
                 self.page.update()
             except Exception as ex:
@@ -444,25 +652,16 @@ class ToysArmyApp:
                 self.page.snack_bar.open = True
                 self.page.update()
 
-        name_field = ft.TextField(label="Nome Lista", value=self.list_name, on_change=lambda e: setattr(self, 'list_name', e.control.value), bgcolor="white", width=320)
+        refresh_list_view()
 
-        main_scroll_content = ft.Column([
-                name_field,
-                ft.Divider(),
-                ft.Container(content=items_col, border=ft.border.all(1, "grey"), border_radius=5, padding=5, bgcolor="white", width=320),
-                ft.Divider(),
-                total_label,
-                ft.ElevatedButton("SALVA LISTA", on_click=save_file, bgcolor="green", color="white")
-            ], scroll="auto", expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
-
-        self.page.add(
-            ft.AppBar(
-                title=ft.Text("Riepilogo"), 
-                bgcolor="blue", color="white",
-                leading=self.get_smart_button("Back.png", "<", lambda _: self.show_units())
-            ),
-            self.wrap_with_bg(main_scroll_content)
-        )
+        # LOGICA TASTO INDIETRO NEL RIEPILOGO
+        if self.coming_from == "units":
+            back_action = lambda _: self.show_units()
+        else:
+            back_action = lambda _: self.show_saved_lists()
+            
+        back_btn = self.get_smart_button("Back.png", "<", back_action)
+        self.page.add(self.build_page("RIEPILOGO", list_view, back_btn))
         self.page.update()
 
 if __name__ == "__main__":
