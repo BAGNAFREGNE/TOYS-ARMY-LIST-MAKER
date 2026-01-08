@@ -549,7 +549,7 @@ class ToysArmyApp:
                 lbl_status,
                 ft.Row([btn_carica, btn_nuova, btn_lista], alignment="spaceBetween", width=320)
             ], horizontal_alignment="center", spacing=10),
-            padding=ft.padding.only(left=20, right=20, bottom=35, top=10),
+            padding=ft.padding.only(left=20, right=20, bottom=60, top=10),
             bgcolor=None 
         )
 
@@ -691,4 +691,5 @@ if __name__ == "__main__":
         ft.app(target=app.main, assets_dir="assets")
     else:
         ft.app(target=app.main)
+
 
