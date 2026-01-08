@@ -55,23 +55,29 @@ class ToysArmyApp:
         # Gestione Tasto Fisico
         if self.current_view == "home":
             return False 
+        
         elif self.current_view == "saved_lists":
+            # Se eravamo nelle unità (caricamento interno), torniamo lì
             if self.coming_from == "units":
                 self.show_units()
             else:
+                # Altrimenti torniamo alla home
                 self.show_home()
+        
         elif self.current_view == "faction":
             self.show_home()
+        
         elif self.current_view == "units":
             self.show_faction()
+        
         elif self.current_view == "summary":
-            # FIX LOGICA INDIETRO
+            # LOGICA CRUCIALE PER IL RITORNO
             if self.coming_from == "saved_lists":
                 self.show_saved_lists()
             elif self.coming_from == "units":
                 self.show_units()
             else:
-                self.show_home() # Fallback
+                self.show_home() 
         return True 
 
     # --- 3. HELPER EXCEL ---
@@ -107,7 +113,7 @@ class ToysArmyApp:
         else:
             return ft.ElevatedButton(text=fallback_text, on_click=action, bgcolor=color, color="white")
 
-    # --- 5. LAYOUT ---
+    # --- 5. LAYOUT (FIX MANUALE VISIBILITÀ) ---
     def build_page(self, title_text, main_content, leading_btn=None, footer_content=None, content_alignment=ft.Alignment(0, -1)):
         
         header_row = ft.Row([
@@ -193,6 +199,7 @@ class ToysArmyApp:
         all_files = [f for f in os.listdir(self.exe_path) if f.endswith(".txt") and f != "requirements.txt"]
         filtered_files = []
 
+        # Se vengo dalle unità, mostro solo quelle di quella fazione
         if self.coming_from == "units" and self.faction != "":
             target_faction_line = f"Fazione: {self.faction}"
             for f in all_files:
@@ -241,6 +248,7 @@ class ToysArmyApp:
                 )
                 list_view.controls.append(container)
 
+        # LOGICA BACK BUTTON NELLA PAGINA LISTE
         if self.coming_from == "units":
              back_action = lambda _: self.show_units()
         else:
@@ -309,25 +317,22 @@ class ToysArmyApp:
             self.total_cost = temp_cost
             self.list_name = temp_name
             
-            # === LOGICA DI NAVIGAZIONE CRUCIALE ===
+            # Aggiorniamo sempre le info di fazione in memoria
+            if temp_faction:
+                self.faction = temp_faction
+                self.alliance = temp_alliance
+
+            # === LOGICA DI NAVIGAZIONE ===
             
-            # 1. Se stavo lavorando su un esercito (es. ho cliccato CARICA mentre facevo una lista)
+            # Se stavamo lavorando su un esercito (internal loading), restiamo lì
             if self.coming_from == "units":
-                if temp_faction:
-                    self.faction = temp_faction
-                    self.alliance = temp_alliance
                 self.load_data(self.faction)
                 
-            # 2. Se vengo dalla Home (es. Archivio Liste)
+            # Se siamo nelle liste salvate (o home), andiamo al riepilogo
             else:
-                # FIX QUI: Forziamo la provenienza su "saved_lists"
-                # Così il tasto back saprà di dover tornare alle liste, non alla home o agli eserciti
+                # FIX IMPORTANTE: Forziamo la provenienza su saved_lists
+                # Questo assicura che quando si preme back dal riepilogo, si torni qui
                 self.coming_from = "saved_lists"
-                
-                if temp_faction:
-                    self.faction = temp_faction
-                    self.alliance = temp_alliance
-                
                 self.show_summary()
 
             self.page.snack_bar = ft.SnackBar(ft.Text(f"Caricata: {self.list_name}", font_family="Courier New"), bgcolor="green")
@@ -384,6 +389,7 @@ class ToysArmyApp:
             self.tank_data = self.get_excel_data(f"Tank {faction}")
             self.mod_tank_data = self.get_excel_data(f"Mod Tank {faction}")
             
+            # Se è una nuova sessione (non vengo da caricamenti), pulisco
             if self.coming_from != "units" and self.coming_from != "saved_lists" and self.list_name == "Nuova_Lista":
                  self.selected_units = []
                  self.compensations = []
@@ -543,7 +549,7 @@ class ToysArmyApp:
                 lbl_status,
                 ft.Row([btn_carica, btn_nuova, btn_lista], alignment="spaceBetween", width=320)
             ], horizontal_alignment="center", spacing=10),
-            padding=ft.padding.only(left=20, right=20, bottom=20, top=10),
+            padding=ft.padding.only(left=20, right=20, bottom=35, top=10),
             bgcolor=None 
         )
 
@@ -668,7 +674,7 @@ class ToysArmyApp:
 
         refresh_list_view()
 
-        # LOGICA BACK SUMMARY
+        # TASTO INDIETRO NEL RIEPILOGO
         if self.coming_from == "saved_lists":
             back_action = lambda _: self.show_saved_lists()
         else:
@@ -685,3 +691,4 @@ if __name__ == "__main__":
         ft.app(target=app.main, assets_dir="assets")
     else:
         ft.app(target=app.main)
+
