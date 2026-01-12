@@ -31,14 +31,15 @@ class ToysArmyApp:
         # --- 2. VARIABILI ---
         self.list_name = "Nuova_Lista"
         self.selected_units = [] 
-        self.compensations = [] 
+        self.compensations = []
+        self.notes = [] # NUOVA VARIABILE PER LE NOTE
         self.total_cost = 0.0
         self.alliance = ""
         self.faction = "" 
         
-        # NUOVE VARIABILI PER IL BUDGET
-        self.budget_limit = 0     # Il tetto massimo (es. 1000)
-        self.budget_active = False # Se la modalità a ritroso è attiva
+        # VARIABILI BUDGET
+        self.budget_limit = 0     
+        self.budget_active = False 
         
         self.current_view = "home" 
         self.coming_from = "home" 
@@ -60,6 +61,7 @@ class ToysArmyApp:
             return False 
         
         elif self.current_view == "saved_lists":
+            # Se venivo dalle unità (caricamento interno), torno lì
             if self.coming_from == "units":
                 self.show_units()
             else:
@@ -71,10 +73,11 @@ class ToysArmyApp:
         elif self.current_view == "units":
             self.show_faction()
             
-        elif self.current_view == "budget_select": # Gestione back dal menu budget
+        elif self.current_view == "budget_select": 
             self.show_units()
         
         elif self.current_view == "summary":
+            # FIX RIGOROSO: Se vengo da saved_lists, torno a saved_lists
             if self.coming_from == "saved_lists":
                 self.show_saved_lists()
             elif self.coming_from == "units":
@@ -116,18 +119,17 @@ class ToysArmyApp:
         else:
             return ft.ElevatedButton(text=fallback_text, on_click=action, bgcolor=color, color="white")
 
-    # --- 5. LAYOUT (AGGIUNTO PARAMETRO top_right_widget) ---
+    # --- 5. LAYOUT ---
     def build_page(self, title_text, main_content, leading_btn=None, footer_content=None, content_alignment=ft.Alignment(0, -1), top_right_widget=None):
         
         header_row = ft.Row([
             leading_btn if leading_btn else ft.Container(width=40),
             
-            # Titolo un po' più piccolo per far spazio al box punteggio se c'è
             ft.Text(
                 title_text.upper(),
                 font_family="Courier New",
                 weight="bold", 
-                size=20, # Ridotto leggermente da 24
+                size=20, 
                 color="white",
                 text_align="center"
             ),
@@ -168,12 +170,11 @@ class ToysArmyApp:
             foreground_column
         ]
 
-        # SE C'È IL QUADRETTO DEL PUNTEGGIO, LO AGGIUNGIAMO IN ALTO A DESTRA
         if top_right_widget:
             stack_layers.append(
                 ft.Container(
                     content=top_right_widget,
-                    top=45, # Stessa altezza del padding header
+                    top=45, 
                     right=10,
                 )
             )
@@ -190,9 +191,10 @@ class ToysArmyApp:
         self.list_name = "Nuova_Lista"
         self.selected_units = []
         self.compensations = []
+        self.notes = [] # Reset note
         self.total_cost = 0.0
         self.faction = "" 
-        self.budget_active = False # Reset budget
+        self.budget_active = False 
         self.budget_limit = 0
         
         main_content = ft.Column([
@@ -212,7 +214,7 @@ class ToysArmyApp:
         self.page.add(self.build_page("TOYS ARMY MENU", main_content, content_alignment=ft.Alignment(0, 0)))
         self.page.update()
 
-    # --- MENU SELEZIONE BUDGET (NUOVO) ---
+    # --- MENU SELEZIONE BUDGET ---
     def show_budget_selector(self):
         self.current_view = "budget_select"
         self.page.clean()
@@ -220,7 +222,6 @@ class ToysArmyApp:
         limits = [500, 1000, 1500, 2000, 2500, 3000]
         btn_list = []
         
-        # Tasto per disattivare il limite
         btn_list.append(
             ft.ElevatedButton("NESSUN LIMITE", width=250, height=50, bgcolor="green", color="white", 
                               on_click=lambda e: self.set_budget(0, False))
@@ -242,7 +243,7 @@ class ToysArmyApp:
     def set_budget(self, limit, active):
         self.budget_limit = limit
         self.budget_active = active
-        self.show_units() # Torna all'editor con le nuove impostazioni
+        self.show_units() 
 
     # --- VISUALIZZA LISTE SALVATE ---
     def show_saved_lists(self):
@@ -318,6 +319,7 @@ class ToysArmyApp:
             
             temp_units = []
             temp_comp = []
+            temp_notes = [] # Temp notes
             temp_cost = 0.0
             temp_faction = ""
             temp_alliance = ""
@@ -327,6 +329,7 @@ class ToysArmyApp:
                 lines = f.readlines()
             
             reading_sconti = False
+            reading_note = False # Flag per le note
             
             for line in lines:
                 line = line.strip()
@@ -339,8 +342,15 @@ class ToysArmyApp:
                 elif line.startswith("Alleanza:"):
                     temp_alliance = line.split(":")[1].strip()
                     
-                elif line.startswith("--- SCONTI ---"): reading_sconti = True
-                elif line.startswith("--- ELENCO"): reading_sconti = False
+                elif line.startswith("--- SCONTI ---"): 
+                    reading_sconti = True
+                    reading_note = False
+                elif line.startswith("--- NOTE ---"): # Intercetta sezione note
+                    reading_sconti = False
+                    reading_note = True
+                elif line.startswith("--- ELENCO"): 
+                    reading_sconti = False
+                    reading_note = False
                 else:
                     if reading_sconti:
                         if line.startswith("- "):
@@ -349,6 +359,9 @@ class ToysArmyApp:
                                 temp_comp.append(val)
                                 temp_cost -= val
                             except: pass
+                    elif reading_note: # Lettura note
+                        if line.startswith("- "):
+                            temp_notes.append(line.replace("- ", ""))
                     else:
                         match = re.match(r"^(.*?) x(\d+) \(([\d\.]+)\)$", line)
                         if match:
@@ -365,6 +378,7 @@ class ToysArmyApp:
 
             self.selected_units = temp_units
             self.compensations = temp_comp
+            self.notes = temp_notes # Assegna note
             self.total_cost = temp_cost
             self.list_name = temp_name
             
@@ -372,13 +386,16 @@ class ToysArmyApp:
                 self.faction = temp_faction
                 self.alliance = temp_alliance
 
-            if self.coming_from == "saved_lists" and temp_faction:
-                self.faction = temp_faction
-                self.alliance = temp_alliance
-                self.coming_from = "saved_lists" # Restiamo su saved_lists per il back
+            # === LOGICA DI NAVIGAZIONE RIGOROSA ===
+            
+            if self.coming_from == "saved_lists":
+                # Se vengo dalle liste salvate, DEVO rimanere in contesto saved_lists
+                # per poter tornare indietro correttamente.
+                self.coming_from = "saved_lists"
                 self.show_summary()
                 
             elif self.coming_from == "units":
+                # Se ero già dentro un'unità, ricarico l'unità
                 self.load_data(self.faction)
             
             else:
@@ -441,8 +458,9 @@ class ToysArmyApp:
             if self.coming_from != "units" and self.coming_from != "saved_lists" and self.list_name == "Nuova_Lista":
                  self.selected_units = []
                  self.compensations = []
+                 self.notes = []
                  self.total_cost = 0.0
-                 self.budget_active = False # Reset budget quando cambio fazione
+                 self.budget_active = False 
             
             self.show_units()
         except Exception as e:
@@ -450,13 +468,12 @@ class ToysArmyApp:
             self.page.snack_bar.open = True
             self.page.update()
 
-    # --- 7. UNITÀ (CON QUADRETTO PUNTEGGIO E TASTO SET) ---
+    # --- 7. UNITÀ (CON NOTE) ---
     def show_units(self):
         self.current_view = "units"
         self.page.clean()
         container_list = []
         
-        # --- CREAZIONE QUADRETTO PUNTEGGIO ---
         score_label = ft.Text("0", weight="bold", size=14, color="white", font_family="Courier New")
         
         def update_score_display():
@@ -473,12 +490,11 @@ class ToysArmyApp:
         score_box = ft.Container(
             content=score_label,
             padding=5,
-            bgcolor="green", # Default
+            bgcolor="green", 
             border_radius=5,
             border=ft.border.all(1, "white")
         )
         
-        # Aggiorno subito il valore iniziale
         if self.budget_active:
             score_label.value = f"RESTANO: {self.budget_limit - self.total_cost:.0f}"
             score_box.bgcolor = "red"
@@ -486,7 +502,6 @@ class ToysArmyApp:
             score_label.value = f"TOT: {self.total_cost:.0f}"
             score_box.bgcolor = "green"
 
-        # --- LOGICA BLOCCHI ---
         def make_block(label, data, cost_idx, desc_idxs):
             opts = []
             for row in data:
@@ -515,7 +530,7 @@ class ToysArmyApp:
             def add_btn_click(e):
                 self.add_item_logic(dd.value, qty.value, data, cost_idx)
                 dd.value = None
-                update_score_display() # Aggiorna il quadretto
+                update_score_display()
                 self.page.snack_bar = ft.SnackBar(ft.Text("Aggiunto!", font_family="Courier New"))
                 self.page.snack_bar.open = True
                 self.page.update()
@@ -543,20 +558,19 @@ class ToysArmyApp:
         except Exception as e:
              self.page.add(ft.Text(f"Errore: {e}", color="red"))
 
+        # --- SEZIONE SCONTI ---
         comp_val = ft.TextField(label="Sconto", width=120, keyboard_type="number", bgcolor="white", text_size=12)
-        
         def apply_comp_click(e):
             try:
                 val = float(comp_val.value)
                 self.compensations.append(val)
                 self.total_cost -= val
                 comp_val.value = ""
-                update_score_display() # Aggiorna il quadretto
+                update_score_display()
                 self.page.snack_bar = ft.SnackBar(ft.Text(f"Sottratto: {val}", font_family="Courier New"))
                 self.page.snack_bar.open = True
                 self.page.update()
-            except:
-                pass
+            except: pass
 
         container_list.append(
             ft.Container(
@@ -566,6 +580,28 @@ class ToysArmyApp:
                 ], horizontal_alignment="center"), 
                 width=320, 
                 padding=10, border=ft.border.all(1, "red"), border_radius=5, margin=ft.margin.only(top=20), bgcolor="white",
+                alignment=ft.Alignment(0, 0)
+            )
+        )
+
+        # --- SEZIONE NOTE (NUOVA) ---
+        note_val = ft.TextField(label="Nota", width=180, bgcolor="white", text_size=12)
+        def add_note_click(e):
+            if note_val.value:
+                self.notes.append(note_val.value)
+                note_val.value = ""
+                self.page.snack_bar = ft.SnackBar(ft.Text("Nota aggiunta!", font_family="Courier New"))
+                self.page.snack_bar.open = True
+                self.page.update()
+
+        container_list.append(
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("NOTE", weight="bold", color="blue", font_family="Courier New"),
+                    ft.Row([note_val, ft.ElevatedButton("AGGIUNGI", on_click=add_note_click, color="white", bgcolor="blue")])
+                ], horizontal_alignment="center"), 
+                width=320, 
+                padding=10, border=ft.border.all(1, "blue"), border_radius=5, margin=ft.margin.only(top=20), bgcolor="white",
                 alignment=ft.Alignment(0, 0)
             )
         )
@@ -598,8 +634,9 @@ class ToysArmyApp:
             self.list_name = "Nuova_Lista"
             self.selected_units = []
             self.compensations = []
+            self.notes = []
             self.total_cost = 0.0
-            self.budget_active = False # Reset budget su nuova lista
+            self.budget_active = False 
             self.show_units() 
             self.page.snack_bar = ft.SnackBar(ft.Text("Lista resettata!", font_family="Courier New"))
             self.page.snack_bar.open = True
@@ -611,7 +648,6 @@ class ToysArmyApp:
             on_click=reset_data_click
         )
 
-        # NUOVO TASTO SET
         btn_set = ft.FloatingActionButton(
             content=ft.Text("SET", weight="bold", font_family="Courier New", size=12),
             width=65, height=40, bgcolor="blue",
@@ -621,12 +657,9 @@ class ToysArmyApp:
         btn_lista = ft.FloatingActionButton(
             content=ft.Text("LISTA", weight="bold", font_family="Courier New", size=12),
             width=65, height=40, bgcolor="green",
-            on_click=lambda _: self.show_summary() # Imposta coming_from=units nel metodo
+            on_click=lambda _: self.go_to_summary_from_units()
         )
         
-        # Override per il bottone lista per assicurarci il ritorno corretto
-        btn_lista.on_click = lambda e: self.go_to_summary_from_units()
-
         footer_content = ft.Container(
             content=ft.Column([
                 lbl_status,
@@ -645,7 +678,6 @@ class ToysArmyApp:
         
         back_btn = self.get_smart_button("Back.png", "<", lambda _: self.show_faction())
         
-        # PASSIAMO IL QUADRETTO PUNTEGGIO (score_box) A BUILD_PAGE
         self.page.add(self.build_page(self.faction, main_scroll, back_btn, footer_content=footer_content, top_right_widget=score_box))
         self.page.update()
 
@@ -685,9 +717,10 @@ class ToysArmyApp:
 
             items_col = ft.Column()
             
-            if not self.selected_units and not self.compensations:
+            if not self.selected_units and not self.compensations and not self.notes:
                 items_col.controls.append(ft.Text("LISTA VUOTA", font_family="Courier New"))
             
+            # Unità
             for u in self.selected_units:
                 row = ft.Row([
                     ft.Text(u['text'], expand=True, font_family="Courier New", weight="bold"),
@@ -695,6 +728,7 @@ class ToysArmyApp:
                 ], alignment="spaceBetween") 
                 items_col.controls.append(row)
 
+            # Sconti
             if self.compensations:
                 items_col.controls.append(ft.Divider(color="black"))
                 items_col.controls.append(ft.Text("SCONTI:", italic=True, color="red", font_family="Courier New"))
@@ -704,11 +738,22 @@ class ToysArmyApp:
                         self.get_smart_button("Cancel.png", "X", lambda e, x=c: remove_comp(x), color="red", size=25)
                     ], alignment="spaceBetween") 
                     items_col.controls.append(row)
+
+            # Note (Visualizzazione)
+            if self.notes:
+                items_col.controls.append(ft.Divider(color="black"))
+                items_col.controls.append(ft.Text("NOTE:", italic=True, color="blue", font_family="Courier New"))
+                for n in self.notes:
+                    row = ft.Row([
+                        ft.Text(f"- {n}", color="blue", expand=True, font_family="Courier New"),
+                        self.get_smart_button("Cancel.png", "X", lambda e, x=n: remove_note(x), color="red", size=25)
+                    ], alignment="spaceBetween") 
+                    items_col.controls.append(row)
             
             list_view.controls.append(ft.Container(content=items_col, border=ft.border.all(2, "black"), border_radius=5, padding=5, bgcolor="white"))
             list_view.controls.append(ft.Divider(color="black"))
             
-            # MOSTRA IL TOTALE O IL RIMANENTE ANCHE QUI
+            # Totale
             if self.budget_active:
                 remaining = self.budget_limit - self.total_cost
                 total_text = f"RESTANO: {remaining:.0f} (Su {self.budget_limit})"
@@ -743,6 +788,10 @@ class ToysArmyApp:
             self.total_cost += comp_val
             refresh_list_view()
 
+        def remove_note(note_val):
+            self.notes.remove(note_val)
+            refresh_list_view()
+
         def save_file(e):
             try:
                 safe_name = "".join([c for c in self.list_name if c.isalnum() or c in (' ', '_')]).strip()
@@ -760,6 +809,9 @@ class ToysArmyApp:
                     if self.compensations:
                         f.write("\n--- SCONTI ---\n")
                         for c in self.compensations: f.write(f"- {c}\n")
+                    if self.notes:
+                        f.write("\n--- NOTE ---\n")
+                        for n in self.notes: f.write(f"- {n}\n")
                         
                 self.page.snack_bar = ft.SnackBar(ft.Text(f"SALVATO: {filename}", font_family="Courier New"), bgcolor="green", duration=4000)
                 self.page.snack_bar.open = True
