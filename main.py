@@ -32,7 +32,7 @@ class ToysArmyApp:
         self.list_name = "Nuova_Lista"
         self.selected_units = [] 
         self.compensations = []
-        self.notes = [] # NUOVA VARIABILE PER LE NOTE
+        self.notes = [] 
         self.total_cost = 0.0
         self.alliance = ""
         self.faction = "" 
@@ -57,6 +57,7 @@ class ToysArmyApp:
         self.show_home()
 
     def handle_back_event(self, e):
+        # Gestione Tasto Indietro
         if self.current_view == "home":
             return False 
         
@@ -77,13 +78,13 @@ class ToysArmyApp:
             self.show_units()
         
         elif self.current_view == "summary":
-            # FIX RIGOROSO: Se vengo da saved_lists, torno a saved_lists
+            # FIX NAVIGAZIONE: Controllo rigoroso della provenienza
             if self.coming_from == "saved_lists":
                 self.show_saved_lists()
             elif self.coming_from == "units":
                 self.show_units()
             else:
-                self.show_home() 
+                self.show_saved_lists() # Fallback sicuro su saved_lists invece di home
         return True 
 
     # --- 3. HELPER EXCEL ---
@@ -191,7 +192,7 @@ class ToysArmyApp:
         self.list_name = "Nuova_Lista"
         self.selected_units = []
         self.compensations = []
-        self.notes = [] # Reset note
+        self.notes = [] 
         self.total_cost = 0.0
         self.faction = "" 
         self.budget_active = False 
@@ -319,7 +320,7 @@ class ToysArmyApp:
             
             temp_units = []
             temp_comp = []
-            temp_notes = [] # Temp notes
+            temp_notes = [] 
             temp_cost = 0.0
             temp_faction = ""
             temp_alliance = ""
@@ -329,7 +330,7 @@ class ToysArmyApp:
                 lines = f.readlines()
             
             reading_sconti = False
-            reading_note = False # Flag per le note
+            reading_note = False 
             
             for line in lines:
                 line = line.strip()
@@ -345,7 +346,7 @@ class ToysArmyApp:
                 elif line.startswith("--- SCONTI ---"): 
                     reading_sconti = True
                     reading_note = False
-                elif line.startswith("--- NOTE ---"): # Intercetta sezione note
+                elif line.startswith("--- NOTE ---"): 
                     reading_sconti = False
                     reading_note = True
                 elif line.startswith("--- ELENCO"): 
@@ -359,7 +360,7 @@ class ToysArmyApp:
                                 temp_comp.append(val)
                                 temp_cost -= val
                             except: pass
-                    elif reading_note: # Lettura note
+                    elif reading_note:
                         if line.startswith("- "):
                             temp_notes.append(line.replace("- ", ""))
                     else:
@@ -378,7 +379,7 @@ class ToysArmyApp:
 
             self.selected_units = temp_units
             self.compensations = temp_comp
-            self.notes = temp_notes # Assegna note
+            self.notes = temp_notes 
             self.total_cost = temp_cost
             self.list_name = temp_name
             
@@ -386,20 +387,16 @@ class ToysArmyApp:
                 self.faction = temp_faction
                 self.alliance = temp_alliance
 
-            # === LOGICA DI NAVIGAZIONE RIGOROSA ===
-            
-            if self.coming_from == "saved_lists":
-                # Se vengo dalle liste salvate, DEVO rimanere in contesto saved_lists
-                # per poter tornare indietro correttamente.
+            # === FIX NAVIGAZIONE v52 ===
+            # Se stiamo caricando dalla lista file (e non dal menu esercito), 
+            # forziamo il "coming_from" per garantire il ritorno corretto.
+            if self.coming_from != "units":
                 self.coming_from = "saved_lists"
-                self.show_summary()
+                self.show_summary() # Andiamo al riepilogo
                 
-            elif self.coming_from == "units":
-                # Se ero già dentro un'unità, ricarico l'unità
-                self.load_data(self.faction)
-            
             else:
-                self.show_summary()
+                # Se eravamo dentro un esercito, ci restiamo
+                self.load_data(self.faction)
 
             self.page.snack_bar = ft.SnackBar(ft.Text(f"Caricata: {self.list_name}", font_family="Courier New"), bgcolor="green")
             self.page.snack_bar.open = True
@@ -455,6 +452,7 @@ class ToysArmyApp:
             self.tank_data = self.get_excel_data(f"Tank {faction}")
             self.mod_tank_data = self.get_excel_data(f"Mod Tank {faction}")
             
+            # Se è una sessione fresca (non vengo da saved_lists o da un reload interno), pulisco
             if self.coming_from != "units" and self.coming_from != "saved_lists" and self.list_name == "Nuova_Lista":
                  self.selected_units = []
                  self.compensations = []
@@ -768,9 +766,10 @@ class ToysArmyApp:
             save_btn = ft.ElevatedButton("SALVA LISTA", on_click=save_file, bgcolor="green", color="white", style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=2)))
             list_view.controls.append(ft.Container(content=save_btn, alignment=ft.Alignment(0, 0)))
             
-            if self.coming_from != "units" and self.faction:
+            # TASTO AGGIUNGI PEZZI (SOLO SE C'È UNA FAZIONE)
+            if self.faction:
                 def go_to_edit_mode(e):
-                    self.coming_from = "units" 
+                    self.coming_from = "units" # Ora entro in modalità modifica
                     self.load_data(self.faction) 
                 
                 edit_btn = ft.ElevatedButton("AGGIUNGI PEZZI", on_click=go_to_edit_mode, bgcolor="blue", color="white", style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=2)))
@@ -823,10 +822,16 @@ class ToysArmyApp:
 
         refresh_list_view()
 
+        # LOGICA BACK BUTTON DAL RIEPILOGO
+        # Se venivo da saved_lists, torno lì.
         if self.coming_from == "saved_lists":
             back_action = lambda _: self.show_saved_lists()
-        else:
+        # Se venivo dalle unità, torno lì.
+        elif self.coming_from == "units":
             back_action = lambda _: self.show_units()
+        else:
+            # Fallback sicuro
+            back_action = lambda _: self.show_saved_lists()
             
         back_btn = self.get_smart_button("Back.png", "<", back_action)
         self.page.add(self.build_page("RIEPILOGO", list_view, back_btn))
