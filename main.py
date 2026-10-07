@@ -516,8 +516,7 @@ class ToysArmyApp:
                 bgcolor="white",
                 dense=True,         
                 text_size=12,
-                content_padding=10,
-                menu_height=250 
+                content_padding=10
             )
             
             qty = ft.TextField(
